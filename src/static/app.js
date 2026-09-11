@@ -501,12 +501,54 @@ document.addEventListener("DOMContentLoaded", () => {
     Object.entries(filteredActivities).forEach(([name, details]) => {
       renderActivityCard(name, details);
     });
+
+    focusSharedActivity();
+  }
+
+  // Build a link that opens this activity when it is shared.
+  function getActivityShareUrl(activityName) {
+    const shareUrl = new URL(window.location.href);
+    shareUrl.hash = `activity-${encodeURIComponent(activityName)}`;
+    return shareUrl.toString();
+  }
+
+  function focusSharedActivity() {
+    if (!window.location.hash.startsWith("#activity-")) {
+      return;
+    }
+
+    const encodedName = window.location.hash.slice("#activity-".length);
+    let activityName;
+    try {
+      activityName = decodeURIComponent(encodedName);
+    } catch (error) {
+      return;
+    }
+
+    const activityCard = [...activitiesList.children].find(
+      (card) => card.dataset.activityName === activityName
+    );
+    if (activityCard) {
+      activityCard.scrollIntoView({ behavior: "smooth", block: "center" });
+      activityCard.classList.add("shared-activity");
+    }
+  }
+
+  async function copyActivityLink(shareUrl) {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      showMessage("Activity link copied to your clipboard.", "success");
+    } catch (error) {
+      showMessage("Unable to copy the activity link.", "error");
+      console.error("Error copying activity link:", error);
+    }
   }
 
   // Function to render a single activity card
   function renderActivityCard(name, details) {
     const activityCard = document.createElement("div");
     activityCard.className = "activity-card";
+    activityCard.dataset.activityName = name;
 
     // Calculate spots and capacity
     const totalSpots = details.max_participants;
@@ -529,6 +571,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Format the schedule using the new helper function
     const formattedSchedule = formatSchedule(details);
+    const shareUrl = getActivityShareUrl(name);
+    const shareText = `Check out ${name} at Mergington High School!`;
+    const encodedShareUrl = encodeURIComponent(shareUrl);
+    const encodedShareText = encodeURIComponent(shareText);
 
     // Create activity tag
     const tagHtml = `
@@ -583,6 +629,40 @@ document.addEventListener("DOMContentLoaded", () => {
             .join("")}
         </ul>
       </div>
+      <div class="activity-sharing" aria-label="Share this activity">
+        <span class="share-label">Share:</span>
+        <a
+          class="share-button share-facebook"
+          href="https://www.facebook.com/sharer/sharer.php?u=${encodedShareUrl}"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Share ${name} on Facebook"
+          title="Share on Facebook"
+        >Facebook</a>
+        <a
+          class="share-button share-x"
+          href="https://twitter.com/intent/tweet?url=${encodedShareUrl}&text=${encodedShareText}"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Share ${name} on X"
+          title="Share on X"
+        >X</a>
+        <a
+          class="share-button share-whatsapp"
+          href="https://wa.me/?text=${encodedShareText}%20${encodedShareUrl}"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Share ${name} on WhatsApp"
+          title="Share on WhatsApp"
+        >WhatsApp</a>
+        <button
+          type="button"
+          class="share-button share-copy"
+          data-share-url="${shareUrl}"
+          aria-label="Copy link for ${name}"
+          title="Copy activity link"
+        >Copy link</button>
+      </div>
       <div class="activity-card-actions">
         ${
           currentUser
@@ -607,6 +687,11 @@ document.addEventListener("DOMContentLoaded", () => {
     deleteButtons.forEach((button) => {
       button.addEventListener("click", handleUnregister);
     });
+
+    const copyShareButton = activityCard.querySelector(".share-copy");
+    copyShareButton.addEventListener("click", () =>
+      copyActivityLink(copyShareButton.dataset.shareUrl)
+    );
 
     // Add click handler for register button (only when authenticated)
     if (currentUser) {
